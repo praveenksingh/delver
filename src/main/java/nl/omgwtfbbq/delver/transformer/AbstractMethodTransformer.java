@@ -82,36 +82,48 @@ public abstract class AbstractMethodTransformer implements ClassFileTransformer 
         if (config.isIncluded(className)) {
             Logger.debug("Included class '%s'", className);
 
-            String wut = Descriptor.toJavaName(className);
-
-            try {
-                ClassPool cp = ClassPool.getDefault();
-                cp.childFirstLookup = true;
-                // This seems to make it work for multiple class loader cruft in WebSphere...
-                // TODO: check other app servers etc.
-                cp.insertClassPath(new LoaderClassPath(loader));
-
-                CtClass cc = cp.get(wut);
-                Logger.debug("Checking class %s", wut);
-
-                CtMethod[] methods = cc.getDeclaredMethods();
-                Logger.debug("  Altering %d methods in %s", methods.length, wut);
-                for (CtMethod m : methods) {
-                    transform(cc, m);
+            boolean calledFromInsidePackage = false;
+            StackTraceElement[] stackTraceElements = new Exception().getStackTrace();
+            for (StackTraceElement stackTraceElement : stackTraceElements) {
+//                String classFromStackTrace = stackTraceElement.getClassName().replace('.', '/');
+                if(config.isIncluded(stackTraceElement.getClassName().replace('.', '/'))){
+                    calledFromInsidePackage = true;
+                    break;
                 }
-                bytecode = cc.toBytecode();
-                cc.detach();
-            } catch (NotFoundException e) {
-                Logger.error("NotFoundException on class '%s': %s", className, e.getMessage());
-                e.printStackTrace();
-            } catch (CannotCompileException e) {
-                Logger.error("Cannot compile class '%s': %s", className, e.getMessage());
-                e.printStackTrace(System.out);
-            } catch (IOException e) {
-                Logger.error("IOException while transforming class '%s': %s", className, e.getMessage());
-            } catch (Exception ex) {
-                Logger.error("Generic exception occurred while transforming class '%s': %s", className, ex.getMessage());
-                ex.printStackTrace(System.out);
+            }
+//            o.getClassName();
+            if (!calledFromInsidePackage) {
+                String wut = Descriptor.toJavaName(className);
+
+                try {
+                    ClassPool cp = ClassPool.getDefault();
+                    cp.childFirstLookup = true;
+                    // This seems to make it work for multiple class loader cruft in WebSphere...
+                    // TODO: check other app servers etc.
+                    cp.insertClassPath(new LoaderClassPath(loader));
+
+                    CtClass cc = cp.get(wut);
+                    Logger.debug("Checking class %s", wut);
+
+                    CtMethod[] methods = cc.getDeclaredMethods();
+                    Logger.debug("  Altering %d methods in %s", methods.length, wut);
+                    for (CtMethod m : methods) {
+                        transform(cc, m);
+                    }
+                    bytecode = cc.toBytecode();
+                    cc.detach();
+                } catch (NotFoundException e) {
+                    Logger.error("NotFoundException on class '%s': %s", className, e.getMessage());
+                    e.printStackTrace();
+                } catch (CannotCompileException e) {
+                    Logger.error("Cannot compile class '%s': %s", className, e.getMessage());
+                    e.printStackTrace(System.out);
+                } catch (IOException e) {
+                    Logger.error("IOException while transforming class '%s': %s", className, e.getMessage());
+                } catch (Exception ex) {
+                    Logger.error("Generic exception occurred while transforming class '%s': %s", className, ex.getMessage());
+                    ex.printStackTrace(System.out);
+                }
             }
         }
 
